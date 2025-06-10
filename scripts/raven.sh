@@ -28,13 +28,23 @@ set -e
 reads=$1            # input reads FASTQ
 assembly=$2         # output assembly prefix (not including file extension)
 threads=$3          # thread count
-read_type=${4:-ONT} # ignored, raven does not have read-specific options
+genome_size=$4      # ignored
+read_type=${5:-ONT} # ONT or PB_HIFI, defaults to ONT if not provided
 
 # Validate input parameters.
 if [[ -z "$reads" || -z "$assembly" || -z "$threads" ]]; then
-    >&2 echo "Usage: $0 <read_fastq> <assembly_prefix> <threads> [read_type]"
+    >&2 echo "Usage: $0 <read_fastq> <assembly_prefix> <threads> <genome_size> [read_type]"
     >&2 echo "  read_type is ignored, as raven does not have read-specific options."
     exit 1
+fi
+
+# Load env if available
+ENV="raven"
+if [[ -f /home/mambauser/.bashrc ]]; then
+    echo "Loading micromamba environment '$ENV'."
+    source /home/mambauser/.bashrc
+    eval "$(micromamba shell hook --shell bash)"
+    micromamba activate "$ENV"
 fi
 
 # Check that the reads file exists.

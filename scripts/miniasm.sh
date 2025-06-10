@@ -32,20 +32,32 @@ set -e
 reads=$1            # input reads FASTQ
 assembly=$2         # output assembly prefix (not including file extension)
 threads=$3          # thread count
-read_type=${4:-ONT} # ONT or PB_HIFI, defaults to ONT if not provided
+genome_size=$4      # ignored
+read_type=${5:-ONT} # ONT or PB_HIFI, defaults to ONT if not provided
 
 # Validate input parameters.
 if [[ -z "$reads" || -z "$assembly" || -z "$threads" ]]; then
-    >&2 echo "Usage: $0 <read_fastq> <assembly_prefix> <threads> [read_type]"
+    >&2 echo "Usage: $0 <read_fastq> <assembly_prefix> <threads> <genome_size> [read_type]"
     >&2 echo "  read_type can be ONT (default) or PB_HIFI"
     exit 1
 fi
 
+# Load env if available
+ENV="minipolish"
+if [[ -f /home/mambauser/.bashrc ]]; then
+    echo "Loading micromamba environment '$ENV'."
+    source /home/mambauser/.bashrc
+    eval "$(micromamba shell hook --shell bash)"
+    micromamba activate "$ENV"
+fi
+
 # Determine tool-specific options based on read_type
 if [[ "$read_type" == "ONT" ]]; then
-    minimap2_preset="ont"
+    preset_overlap="ava-ont"
+    preset_mapping="map-ont"
 elif [[ "$read_type" == "PB_HIFI" ]]; then
-    minimap2_preset="hifi"
+    preset_overlap="ava-pb"
+    preset_mapping="map-hifi"
 else
     >&2 echo "Error: Invalid read_type: $read_type. Must be 'ONT' or 'PB_HIFI'."
     exit 1
@@ -79,7 +91,7 @@ cleanup() {
 trap cleanup EXIT
 
 # Find read overlaps with minimap2.
-minimap2 -x "ava-$minimap2_preset" -t "$threads" "$reads" "$reads" > "$temp_dir"/overlap.paf
+minimap2 -x "$preset_overlap" -t "$threads" "$reads" "$reads" > "$temp_dir"/overlap.paf
 
 # Run miniasm to make an unpolished assembly.
 miniasm -f "$reads" "$temp_dir"/overlap.paf > "$temp_dir"/unpolished.gfa
@@ -91,7 +103,7 @@ if [[ ! -s "$temp_dir"/unpolished.gfa ]]; then
 fi
 
 # Polish the assembly with Minipolish, outputting the result to stdout.
-minipolish --minimap2-preset "map-$minimap2_preset" --threads "$threads" "$reads" "$temp_dir"/unpolished.gfa > "$assembly".gfa
+minipolish --minimap2-preset "$preset_mapping" --threads "$threads" "$reads" "$temp_dir"/unpolished.gfa > "$assembly".gfa
 
 # Check if Minipolish ran successfully.
 if [[ ! -s "$assembly".gfa ]]; then

@@ -39,6 +39,15 @@ if [[ -z "$reads" || -z "$assembly" || -z "$threads" || -z "$genome_size" ]]; th
     exit 1
 fi
 
+# Load env if available
+ENV="canu"
+if [[ -f /home/mambauser/.bashrc ]]; then
+    echo "Loading micromamba environment '$ENV'."
+    source /home/mambauser/.bashrc
+    eval "$(micromamba shell hook --shell bash)"
+    micromamba activate "$ENV"
+fi
+
 # Check that the reads file exists.
 if [[ ! -f "$reads" ]]; then
     >&2 echo "Error: $reads does not exist"
